@@ -1,0 +1,45 @@
+/*
+Create hadoop directory
+hadoop fs -mkdir /mydata/
+hadoop fs -mkdir /mydata/books_users/
+
+copy from local file system
+hadoop fs -copyFromLocal /media/windows-share/BX-Book-Ratings.sql /mydata/books/
+hadoop fs -cat /mydata/books/BX-Book-Ratings.sql
+
+OR
+Sqoop import from mysql database
+sqoop import --connect jdbc:mysql://localhost/books --username root -P --fields-terminated-by ',' --warehouse-dir /mydata/books/ --table bookratings
+
+*/
+
+//Spark SQL Application
+
+// Create the SQLContext first from the existing Spark Context
+val sqlContext = new org.apache.spark.sql.SQLContext(sc)
+
+// Import statement to implicitly convert an RDD to a DataFrame
+import sqlContext.implicits._
+
+// Create a custom class to represent the BookRatings
+case class BookRatings(user_id: Int, isbn: String, book_rating: Int)
+
+
+// Create a DataFrame of BookRatings objects from the dataset text file, Also loading the data from hdfs and find the path of hdfs in core-site.xml
+val bookratings = sc.textFile("hdfs://localhost:9000/mydata/books/BX-Book-Ratings.sql").map(_.split(",")).map(b => BookRatings(b(0).trim.toInt, b(1), b(2).trim.toInt)).toDF()
+
+// Register DataFrame as a table.
+bookratings.registerTempTable("bookratings")
+
+// Display the top 20 content of DataFrame
+bookratings.show()
+
+// Print the DF schema
+bookratings.printSchema()
+
+// Select top20 user id
+bookratings.select("user_id").show()
+
+// Firing various queries for data analysis, would face issue with the single node cluster
+bookratings.filter(bookratings("user_id").equalTo(276725)).show()
+val isbn = bookratings.map(t => "ISBN: " + t(0)).collect().foreach(println)
